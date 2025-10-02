@@ -308,7 +308,16 @@ func (this *service) ShouldRateLimit(
 	}()
 
 	response := this.shouldRateLimitWorker(ctx, request)
-	logger.Debugf("returning normal response: %+v", response)
+	var reqID string
+	for _, d := range request.Descriptors {
+		for _, e := range d.Entries {
+			if e.Key == "request_id" {
+				reqID = e.Value
+				break
+			}
+		}
+	}
+	logger.Debugf("returning normal response: %+v for request string: %s", response, reqID)
 
 	return response, nil
 }
