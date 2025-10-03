@@ -2,6 +2,7 @@ package ratelimit
 
 import (
 	"fmt"
+	"encoding/json"
 	"math"
 	"strconv"
 	"strings"
@@ -307,7 +308,9 @@ func (this *service) ShouldRateLimit(
 		}
 	}()
 
+
 	response := this.shouldRateLimitWorker(ctx, request)
+	// Extract request_id
 	var reqID string
 	for _, d := range request.Descriptors {
 		for _, e := range d.Entries {
@@ -317,8 +320,35 @@ func (this *service) ShouldRateLimit(
 			}
 		}
 	}
-	logger.Debugf("returning normal response: %+v for request string: %s", response, reqID)
 
+	rules := []string{}
+	for _, d := range request.Descriptors {
+		for _, e := range d.Entries {
+			if strings.HasPrefix(e.Key, "rule-") {
+				parts := strings.SplitN(e.Key, "-match-", 2)
+				if len(parts) > 0 {
+					rules = append(rules, parts[0])
+					break
+				}
+			}
+		}
+	}
+
+	result := make(map[string]string)
+	result["request-id"] = reqID
+	for i, rule := range rules {
+		if i < len(response.Statuses) {
+			result[rule] = response.Statuses[i].Code.String()
+		}
+	}
+
+	if b, err := json.Marshal(result); err != nil {
+		logger.Errorf("failed to marshal result: %v, err")
+	} else {
+		logger.Debugf(string(b))
+	}
+	logger.Debugf("logging request: %+v", request)
+	logger.Debugf("logging response: %+v", response)
 	return response, nil
 }
 
